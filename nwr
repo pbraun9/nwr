@@ -1,0 +1,103 @@
+#!/bin/ksh
+
+data=fastio/metrics.xentop
+fastio=fastio/lalatmp
+showvalues=0
+showsparks=1
+
+function bomb {
+	print "Error: $@"
+	exit 1
+}
+
+function requires {
+	[[ -x `whence grep` ]] || bomb grep executable not found
+	[[ -x `whence egrep` ]] || bomb egrep executable not found
+	[[ -x `whence cut` ]] || bomb cut executable not found
+	[[ -x `whence sed` ]] || bomb sed executable not found
+	[[ -x `whence awk` ]] || bomb awk executable not found
+	[[ -x `whence spark` ]] || bomb spark executable not found
+}
+
+function longest {
+	lenght=`echo -n $guest | wc -c`
+	(( lenght > longest )) && (( longest = lenght ))
+	unset lenght
+}
+
+function printspaces {
+	until (( spaces < 1 )); do
+		print ' \c'
+		(( spaces = spaces - 1 ))
+	done
+	unset spaces
+}
+
+function cpu {
+	(( spaces = longest - `echo -n $guest | wc -c` + 1 ))
+	printspaces
+	print $guest CPU \\c
+        (( max = ( `grep ^processor /proc/cpuinfo | tail -1 | cut -f2 -d:` + 1 ) * 100 ))
+	#print cpu max is $max
+        values=`egrep "^[[:space:]]*$guest " $data | awk '{print $4}' | tail -$cols`
+        (( showvalues == 1 )) && echo $max $values
+        (( showsparks == 1 )) && spark $max $values | sed -r 's/^...//'
+        unset max values
+}
+
+function ram {
+	(( spaces = longest + 2 ))
+	printspaces
+	print RAM \\c
+	max=`egrep "^[[:space:]]*$guest " $data | head -1 | awk '{print $7}'`
+	values=`egrep "^[[:space:]]*$guest " $data | awk '{print $5}' | tail -$cols`
+	(( showvalues == 1 )) && echo $max $values
+	(( showsparks == 1 )) && spark $max $values | sed -r 's/^...//'
+	unset max values
+}
+
+function guests {
+        for guest in $guests; do
+                (( spaces = longest - `echo -n $guest | wc -c` + 1 ))
+		(( cols = termcols - longest - 3 * 2 ))
+                #print spaces is $spaces
+		cpu
+		ram
+        done; unset guest
+}
+
+function header {
+	HOSTNAME=${HOSTNAME:-`uname -n`}
+	(( termcols = `tput cols` ))
+	(( spaces = ( termcols - `echo -n $HOSTNAME | wc -c` ) / 2 ))
+	printspaces
+	bold=`tput bold`
+	sgr0=`tput sgr0`
+	print "$bold $HOSTNAME $sgr0"
+}
+
+function main {
+	requires
+
+	while true; do
+		#guests=`egrep -v '^[[:space:]]*NAME ' metrics.xentop | awk '{print $1}' | sort -u`
+		guests=`xl li | sed 1d | awk '{print $1}'`
+
+		longest=0
+	        for guest in $guests; do
+			longest
+		done; unset guest
+		#print longest is $longest
+
+		header > $fastio
+		guests >> $fastio
+		clear
+		cat $fastio
+		sleep 1
+	done
+
+	unset longest spaces
+}
+
+main $@
+
