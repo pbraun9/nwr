@@ -123,7 +123,7 @@ function rsect {
         echo $guest:$diff >> fastio/rsdiff.$date
         rsfiles=`ls -1tr fastio/rsdiff.* | tail -$cols`
         unset newvalue oldvalue diff
-        print ' \c'
+	(( filescount < cols )) && print ' \c'
         values=`egrep --no-filename "^$guest:" $rsfiles | cut -f2 -d:`
         (( showvalues == 1 )) && echo $maxrsect $values
         (( showsparks == 1 )) && spark $maxrsect $values | sed -r 's/^...//'
@@ -142,7 +142,7 @@ function wsect {
         echo $guest:$diff >> fastio/wsdiff.$date
         wsfiles=`ls -1tr fastio/wsdiff.* | tail -$cols`
         unset newvalue oldvalue diff
-        print ' \c'
+	(( filescount < cols )) && print ' \c'
         values=`egrep --no-filename "^$guest:" $wsfiles | cut -f2 -d:`
         (( showvalues == 1 )) && echo $maxwsect $values
         (( showsparks == 1 )) && spark $maxwsect $values | sed -r 's/^...//'
