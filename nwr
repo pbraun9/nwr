@@ -1,7 +1,9 @@
 #!/bin/ksh
 
-data=fastio/metrics.xentop
-fastio=fastio/lalatmp
+bridgenic=eth1
+maxrsect=480000
+maxwsect=800
+
 showvalues=0
 showsparks=1
 
@@ -11,12 +13,20 @@ function bomb {
 }
 
 function requires {
-	[[ -x `whence grep` ]] || bomb grep executable not found
-	[[ -x `whence egrep` ]] || bomb egrep executable not found
-	[[ -x `whence cut` ]] || bomb cut executable not found
-	[[ -x `whence sed` ]] || bomb sed executable not found
-	[[ -x `whence awk` ]] || bomb awk executable not found
-	[[ -x `whence spark` ]] || bomb spark executable not found
+	whence cat >/dev/null || bomb cat executable not found
+	whence grep >/dev/null || bomb grep executable not found
+	whence egrep >/dev/null || bomb egrep executable not found
+	whence wc >/dev/null || bomb wc executable not found
+	whence cut >/dev/null || bomb cut executable not found
+	whence sed >/dev/null || bomb sed executable not found
+	whence awk >/dev/null || bomb awk executable not found
+
+	whence xentop >/dev/null || bomb xentop executable not found
+	whence mii-tool >/dev/null || bomb mii-tool executable not found
+	whence spark >/dev/null || bomb spark executable not found
+	[[ -d fastio/ ]] || bomb need fastio/ folder, ideally as tmpfs
+
+	#whence find >/dev/null || bomb find executable not found
 }
 
 function longest {
@@ -37,51 +47,152 @@ function cpu {
 	(( spaces = longest - `echo -n $guest | wc -c` + 1 ))
 	printspaces
 	print $guest CPU \\c
-        (( max = ( `grep ^processor /proc/cpuinfo | tail -1 | cut -f2 -d:` + 1 ) * 100 ))
-	#print cpu max is $max
-        values=`egrep "^[[:space:]]*$guest " $data | awk '{print $4}' | tail -$cols`
-        (( showvalues == 1 )) && echo $max $values
-        (( showsparks == 1 )) && spark $max $values | sed -r 's/^...//'
-        unset max values
+        [[ $oldfile = $files ]] && echo && return
+        (( newvalue = `egrep "^[[:space:]]*$guest " fastio/xentop.$date | awk '{print $3}'` ))
+        (( oldvalue = `egrep "^[[:space:]]*$guest " $oldfile | awk '{print $3}'` ))
+        (( diff = newvalue - oldvalue ))
+	#print diff is $diff
+	echo $guest:$diff >> fastio/cpudiff.$date
+	cpufiles=`ls -1tr fastio/cpudiff.* | tail -$cols`
+	unset newvalue oldvalue diff
+        (( filescount < cols )) && print ' \c'
+	values=`egrep --no-filename "^$guest:" $cpufiles | cut -f2 -d:`
+        (( showvalues == 1 )) && echo $maxcpu $values
+        (( showsparks == 1 )) && spark $maxcpu $values | sed -r 's/^...//'
+        unset values
 }
 
 function ram {
 	(( spaces = longest + 2 ))
 	printspaces
 	print RAM \\c
-	max=`egrep "^[[:space:]]*$guest " $data | head -1 | awk '{print $7}'`
-	values=`egrep "^[[:space:]]*$guest " $data | awk '{print $5}' | tail -$cols`
-	(( showvalues == 1 )) && echo $max $values
-	(( showsparks == 1 )) && spark $max $values | sed -r 's/^...//'
-	unset max values
+	maxram=`egrep "^[[:space:]]*$guest " fastio/xentop.$date | head -1 | awk '{print $7}'`
+	values=`egrep --no-filename "^[[:space:]]*$guest " $files | awk '{print $5}'`
+	(( showvalues == 1 )) && echo $maxram $values
+	(( showsparks == 1 )) && spark $maxram $values | sed -r 's/^...//'
+	unset maxram values
+}
+
+function tx {
+	(( spaces = longest + 3 ))
+	printspaces
+	print TX \\c
+	[[ $oldfile = $files ]] && echo && return
+        (( newvalue = `egrep "^[[:space:]]*$guest " fastio/xentop.$date | awk '{print $11}'` ))
+        (( oldvalue = `egrep "^[[:space:]]*$guest " $oldfile | awk '{print $11}'` ))
+        (( diff = newvalue - oldvalue ))
+        #print diff is $diff
+	echo $guest:$diff >> fastio/txdiff.$date
+	txfiles=`ls -1tr fastio/txdiff.* | tail -$cols`
+	unset newvalue oldvalue diff
+        (( filescount < cols )) && print ' \c'
+	values=`egrep --no-filename "^$guest:" $txfiles | cut -f2 -d:`
+	(( showvalues == 1 )) && echo $maxnet $values
+	(( showsparks == 1 )) && spark $maxnet $values | sed -r 's/^...//'
+	unset values
+}
+
+function rx {
+        (( spaces = longest + 3 ))
+        printspaces
+        print RX \\c
+        [[ $oldfile = $files ]] && echo && return
+        (( newvalue = `egrep "^[[:space:]]*$guest " fastio/xentop.$date | awk '{print $12}'` ))
+        (( oldvalue = `egrep "^[[:space:]]*$guest " $oldfile | awk '{print $12}'` ))
+        (( diff = newvalue - oldvalue ))
+        #print diff is $diff
+        echo $guest:$diff >> fastio/rxdiff.$date
+        rxfiles=`ls -1tr fastio/rxdiff.* | tail -$cols`
+        unset newvalue oldvalue diff
+        (( filescount < cols )) && print ' \c'
+        values=`egrep --no-filename "^$guest:" $rxfiles | cut -f2 -d:`
+        (( showvalues == 1 )) && echo $maxnet $values
+        (( showsparks == 1 )) && spark $maxnet $values | sed -r 's/^...//'
+        unset values
+}
+
+function rsect {
+        (( spaces = longest + 3 ))
+        printspaces
+        print RS \\c
+        [[ $oldfile = $files ]] && echo && return
+        (( newvalue = `egrep "^[[:space:]]*$guest " fastio/xentop.$date | awk '{print $17}'` ))
+        (( oldvalue = `egrep "^[[:space:]]*$guest " $oldfile | awk '{print $17}'` ))
+        (( diff = newvalue - oldvalue ))
+        #print diff is $diff
+        echo $guest:$diff >> fastio/rsdiff.$date
+        rsfiles=`ls -1tr fastio/rsdiff.* | tail -$cols`
+        unset newvalue oldvalue diff
+        print ' \c'
+        values=`egrep --no-filename "^$guest:" $rsfiles | cut -f2 -d:`
+        (( showvalues == 1 )) && echo $maxrsect $values
+        (( showsparks == 1 )) && spark $maxrsect $values | sed -r 's/^...//'
+        unset values
+}
+
+function wsect {
+        (( spaces = longest + 3 ))
+        printspaces
+        print WS \\c
+        [[ $oldfile = $files ]] && echo && return
+        (( newvalue = `egrep "^[[:space:]]*$guest " fastio/xentop.$date | awk '{print $18}'` ))
+        (( oldvalue = `egrep "^[[:space:]]*$guest " $oldfile | awk '{print $18}'` ))
+        (( diff = newvalue - oldvalue ))
+        #print diff is $diff
+        echo $guest:$diff >> fastio/wsdiff.$date
+        wsfiles=`ls -1tr fastio/wsdiff.* | tail -$cols`
+        unset newvalue oldvalue diff
+        print ' \c'
+        values=`egrep --no-filename "^$guest:" $wsfiles | cut -f2 -d:`
+        (( showvalues == 1 )) && echo $maxwsect $values
+        (( showsparks == 1 )) && spark $maxwsect $values | sed -r 's/^...//'
+        unset values
 }
 
 function guests {
         for guest in $guests; do
                 (( spaces = longest - `echo -n $guest | wc -c` + 1 ))
-		(( cols = termcols - longest - 3 * 2 ))
+
                 #print spaces is $spaces
 		cpu
 		ram
+		tx
+		rx
+		rsect
+		wsect
         done; unset guest
 }
 
 function header {
 	HOSTNAME=${HOSTNAME:-`uname -n`}
-	(( termcols = `tput cols` ))
-	(( spaces = ( termcols - `echo -n $HOSTNAME | wc -c` ) / 2 ))
+	tmp=`xl info 2>&1`
+	(( totalram = `echo "$tmp" | grep ^total_memory | cut -f2 -d:` ))
+	(( usedram = totalram - `echo "$tmp" | grep ^free_memory | cut -f2 -d:` ))
+	unset tmp
+	title="$HOSTNAME - CPU $maxcpu sec - RAM $usedram/$totalram MiB - FDX $maxnet Mbits/s"
+	(( spaces = ( termcols - `echo -n $title | wc -c` ) / 2 ))
 	printspaces
 	bold=`tput bold`
 	sgr0=`tput sgr0`
-	print "$bold $HOSTNAME $sgr0"
+	print "$bold $title $sgr0"
 }
 
 function main {
 	requires
 
+	# 16 cores -> 1600 % -> 20 cpu seconds (test results)
+        (( maxcpu = ( `grep ^processor /proc/cpuinfo | tail -1 | cut -f2 -d:` + 1 ) * 100 / 80 ))
+	(( maxnet = `mii-tool $bridgenic | cut -f3 -d' ' | sed -r 's/[^[:digit:]]//g'` ))
+	#print maxnet is $maxnet
+	#read
+
+	rm -f fastio/xentop.* fastio/*diff.*
 	while true; do
-		#guests=`egrep -v '^[[:space:]]*NAME ' metrics.xentop | awk '{print $1}' | sort -u`
-		guests=`xl li | sed 1d | awk '{print $1}'`
+		date=`date +%s`
+		xentop -f -b -i 1 > fastio/xentop.$date
+		guests=`egrep -v '^[[:space:]]*NAME ' fastio/xentop.$date | awk '{print $1}'`
+		#guests=load2
+		#guests=`xl li | sed 1d | awk '{print $1}'`
 
 		longest=0
 	        for guest in $guests; do
@@ -89,14 +200,22 @@ function main {
 		done; unset guest
 		#print longest is $longest
 
-		header > $fastio
-		guests >> $fastio
+		(( termcols = `tput cols` ))
+		(( cols = termcols - longest - 3 * 2 ))
+
+                filescount=`ls -1tr fastio/xentop.* | wc -l`
+                files=`ls -1tr fastio/xentop.* | tail -$cols`
+                #eventually takes the only file as oldfile
+                oldfile=`ls -1tr fastio/xentop.* | tail -2 | head -1`
+
+		header > fastio/tmpout
+		guests >> fastio/tmpout
 		clear
-		cat $fastio
+		cat fastio/tmpout
 		sleep 1
 	done
 
-	unset longest spaces
+	unset longest spaces maxcpu maxnet
 }
 
 main $@
