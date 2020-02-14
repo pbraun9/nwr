@@ -4,14 +4,16 @@ Performance monitoring from the terminal.
 Currently only XEN (as with `xentop`) is supported.  
 To be executed on every single node.  
 
+![nwr2](i/nwr2.png)
+
 ## Requirements
 
 _tested with_
 
 - XEN 4.11
-- DOMU with [TMEM enabled](https://wiki.xenproject.org/wiki/TMEM)
+- DomUs with [TMEM enabled](https://wiki.xenproject.org/wiki/TMEM)
 - KSH93
-- [spark.bash](https://github.com/holman/spark) or spark.c
+- [spark.bash](https://github.com/holman/spark) or `spark.c`
 
 preferably `spark.c`
 
