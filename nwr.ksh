@@ -25,7 +25,6 @@ function requires {
 	whence ls >/dev/null || bomb ls executable not found
 	whence cat >/dev/null || bomb cat executable not found
 	whence grep >/dev/null || bomb grep executable not found
-	whence egrep >/dev/null || bomb egrep executable not found
 	whence wc >/dev/null || bomb wc executable not found
 	whence tput >/dev/null || bomb tput executable not found
 	whence tr >/dev/null || bomb tr executable not found
@@ -78,9 +77,9 @@ function xentopdiff {
 
         #[[ $oldfile = $file ]] && return
         [[ $oldfile = $files ]] && return
-        #egrep "^[[:space:]]*$guest " $file | awk "{print \$$xentopfield}"
-        (( newvalue = `egrep "^[[:space:]]*$guest " $file | awk "{print \\$$xentopfield}"` ))
-        (( oldvalue = `egrep "^[[:space:]]*$guest " $oldfile | awk "{print \\$$xentopfield}"` ))
+        #grep -E "^[[:space:]]*$guest " $file | awk "{print \$$xentopfield}"
+        (( newvalue = `grep -E "^[[:space:]]*$guest " $file | awk "{print \\$$xentopfield}"` ))
+        (( oldvalue = `grep -E "^[[:space:]]*$guest " $oldfile | awk "{print \\$$xentopfield}"` ))
         (( diff = newvalue - oldvalue ))
         unset newvalue oldvalue
         echo $guest:$diff >> fastio/${restype}diff.$date
@@ -88,8 +87,10 @@ function xentopdiff {
         (( diff == 0 && hideidle == 1 )) && return
         unset diff
         typeset tmpfiles=`ls -1tr fastio/${restype}diff.* | tail -$cols`
-        values=`egrep --no-filename "^$guest:" $tmpfiles | cut -f2 -d:`
+        values=`grep -E --no-filename "^$guest:" $tmpfiles | cut -f2 -d:`
 
+	#the trick: we first print a max value, and then get rid of it with sed
+	#namely the first three chars
         (( `echo $values | sed -r 's/ /+/g'` == 0 && hideidle == 2 )) && return
         typeset restypeup=`echo $restype | tr 'a-z' 'A-Z'`
         startwagon $restypeup
@@ -99,10 +100,11 @@ function xentopdiff {
         unset values
 }
 
-function ram {
-	(( showram == 0 )) && return
-	maxram=`egrep "^[[:space:]]*$guest " fastio/xentop.$date | head -1 | awk '{print $7}'` # MAXMEM(k)
-	values=`egrep --no-filename "^[[:space:]]*$guest " $files | awk '{print $5}'` # MEM(k)
+function showram {
+	#dom0 does not have tmem and maxram="no limit"
+	[[ $guest = Domain-0 ]] && return
+	maxram=`grep -E "^[[:space:]]*$guest " fastio/xentop.$date | head -1 | awk '{print $7}'` # MAXMEM(k)
+	values=`grep -E --no-filename "^[[:space:]]*$guest " $files | awk '{print $5}'` # MEM(k)
 	startwagon RAM
 	(( showvalues == 1 )) && echo $maxram $values
 	(( showsparks == 1 )) && spark $maxram $values | sed -r 's/^...//'
@@ -114,7 +116,7 @@ function guests {
                 (( spaces = longest - `echo -n $guest | wc -c` + 1 ))
 
 		(( showcpu == 1 )) && xentopdiff cpu 3 $maxcpu # CPU(sec)
-		ram # MEM(k)
+		(( showram == 1 )) && showram # MEM(k)
 		(( showtx == 1 )) && xentopdiff tx 11 $maxnet # NETTX(k)
 		(( showrx == 1 )) && xentopdiff rx 12 $maxnet # NETRX(k)
 		(( showrs == 1 )) && xentopdiff rs 17 $maxcpu # VBD_RSECT
@@ -147,13 +149,13 @@ function main {
 	#print maxnet is $maxnet
 	#read
 
-	rm -f fastio/xentop.* fastio/*diff.*
+	rm -f fastio/xentop.* fastio/*diff.* fastio/tmpout
 	while true; do
 		date=`date +%s`
 		file=fastio/xentop.$date
 
 		xentop -f -b -i 1 > $file
-		guests=`egrep -v '^[[:space:]]*NAME ' $file | awk '{print $1}'`
+		guests=`grep -vE '^[[:space:]]*NAME ' $file | awk '{print $1}'`
 		#guests=load2
 		#guests=`xl li | sed 1d | awk '{print $1}'`
 
@@ -163,7 +165,8 @@ function main {
 		done; unset guest
 
 		(( termcols = `tput cols` ))
-		(( cols = termcols - longest - 3 * 2 ))
+		(( cols = termcols - longest - 3 * 2 - 1 ))
+		# - 1 so there is a remaining blank col at the end
 
                 filescount=`ls -1tr fastio/xentop.* | wc -l`
                 files=`ls -1tr fastio/xentop.* | tail -$cols`

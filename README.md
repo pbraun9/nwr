@@ -4,15 +4,16 @@ Performance monitoring from the terminal.
 Currently only XEN (as with `xentop`) is supported.  
 To be executed on every single node.  
 
-## Prerequisite
+## Requirements
 
-tested with
+_tested with_
 
 - XEN 4.11
+- DOMU with [TMEM enabled](https://wiki.xenproject.org/wiki/TMEM)
 - KSH93
-- [spark.bash](https://github.com/holman/spark) and spark.c
+- [spark.bash](https://github.com/holman/spark) or spark.c
 
-preferably spark.c
+preferably `spark.c`
 
 	wget https://git.zx2c4.com/spark/plain/spark.c
 	gcc -o spark spark.c -lm
@@ -47,26 +48,37 @@ when finished
 
 _on some guest_
 
+	apt install -y stress iperf3 hdparm
+
 CPU
 
-	nice stress --cpu 16
+	grep ^proc /proc/cpuinfo
+	nice stress --cpu 8
 
 RAM (assuming ballooning or TMEM)
 
 	lsmod | grep tmem
+	#stress -m 8 --vm-keep
 	mkdir -p ram/
 	mount -t tmpfs -o size=7168M tmpfs ram/
 	dd if=/dev/zero of=ram/ramload bs=1M
+	rm -f ram/ramload 
+	umount ram/
+	rmdir ram/
 
-TX/RX
+Note: it shrinks back after a while (few seconds/minutes)
+
+TX - start the server on the load guest
+
+RX - start the server on the host or remote node
 
 	iperf3 -s # server
 	iperf3 -c SERVER_ADDRESS # client
 
 RSECT
 
-	hdparm -Tt /dev/xvda
-	dd if=/dev/xvda of=/dev/null
+	hdparm -Tt /dev/xvda1
+	dd if=/dev/xvda1 of=/dev/null
 
 WSECT
 
