@@ -22,16 +22,17 @@ function bomb {
 }
 
 function requires {
-	whence ls >/dev/null || bomb ls executable not found
+	whence awk >/dev/null || bomb awk executable not found
 	whence cat >/dev/null || bomb cat executable not found
+	whence cut >/dev/null || bomb cut executable not found
+	#whence find >/dev/null || bomb find executable not found
+	whence free >/dev/null || bomb free executable not found
 	whence grep >/dev/null || bomb grep executable not found
-	whence wc >/dev/null || bomb wc executable not found
+	whence ls >/dev/null || bomb ls executable not found
 	whence tput >/dev/null || bomb tput executable not found
 	whence tr >/dev/null || bomb tr executable not found
-	whence cut >/dev/null || bomb cut executable not found
 	whence sed >/dev/null || bomb sed executable not found
-	whence awk >/dev/null || bomb awk executable not found
-	#whence find >/dev/null || bomb find executable not found
+	whence wc >/dev/null || bomb wc executable not found
 
 	whence xentop >/dev/null || bomb xentop executable not found
 	whence mii-tool >/dev/null || bomb mii-tool executable not found
@@ -101,9 +102,13 @@ function xentopdiff {
 }
 
 function showram {
-	#dom0 does not have tmem hence eats your ram, and also shows MAXMEM(k) "no limit"
-	#maybe autoballoon="on" would help to get decent and usable RAM metrics from the host
+	#dom0 does not have tmem hence eats your ram and shows MAXMEM(k) "no limit"
+	#we do not differenciate dom0_mem vs autoballoon here
 	[[ $guest = Domain-0 ]] && return
+	#if [[ $guest = Domain-0 ]]; then
+	#	maxram=`free --kilo | grep ^Mem: | awk '{print $2}'`
+	#else
+	#fi
 	maxram=`grep -E "^[[:space:]]*$guest " fastio/xentop.$date | head -1 | awk '{print $7}'` # MAXMEM(k)
 	values=`grep -E --no-filename "^[[:space:]]*$guest " $files | awk '{print $5}'` # MEM(k)
 	startwagon RAM
@@ -112,7 +117,7 @@ function showram {
 	unset maxram values
 }
 
-function guests {
+function showguests {
         for guest in $guests; do
                 (( spaces = longest - `echo -n $guest | wc -c` + 1 ))
 
@@ -131,9 +136,9 @@ function header {
 	HOSTNAME=${HOSTNAME:-`uname -n`}
 	tmp=`xl info 2>&1`
 	(( totalram = `echo "$tmp" | grep ^total_memory | cut -f2 -d:` ))
-	(( usedram = totalram - `echo "$tmp" | grep ^free_memory | cut -f2 -d:` ))
+	#(( usedram = totalram - `echo "$tmp" | grep ^free_memory | cut -f2 -d:` ))
 	unset tmp
-	title="$HOSTNAME - CPU $maxcpu sec - RAM $usedram/$totalram MiB - FDX $maxnet Mbits/s"
+	title="$HOSTNAME - $maxcpu CPU seconds - $totalram MB - $maxwsect/$maxrsect sectors/s - FDX $maxnet Mbits/s"
 	(( spaces = ( termcols - `echo -n $title | wc -c` ) / 2 ))
 	printspaces
 	bold=`tput bold`
@@ -157,8 +162,8 @@ function main {
 
 		xentop -f -b -i 1 > $file
 		guests=`grep -vE '^[[:space:]]*NAME ' $file | awk '{print $1}'`
-		#guests=load2
 		#guests=`xl li | sed 1d | awk '{print $1}'`
+		#guests=load
 
 		longest=0
 	        for guest in $guests; do
@@ -175,7 +180,7 @@ function main {
                 oldfile=`ls -1tr fastio/xentop.* | tail -2 | head -1`
 
 		header > fastio/tmpout
-		guests >> fastio/tmpout
+		showguests >> fastio/tmpout
 		clear
 		cat fastio/tmpout
 		sleep 1
