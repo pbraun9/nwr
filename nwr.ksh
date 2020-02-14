@@ -101,7 +101,8 @@ function xentopdiff {
 }
 
 function showram {
-	#dom0 does not have tmem and maxram="no limit"
+	#dom0 does not have tmem hence eats your ram, and also shows MAXMEM(k) "no limit"
+	#maybe autoballoon="on" would help to get decent and usable RAM metrics from the host
 	[[ $guest = Domain-0 ]] && return
 	maxram=`grep -E "^[[:space:]]*$guest " fastio/xentop.$date | head -1 | awk '{print $7}'` # MAXMEM(k)
 	values=`grep -E --no-filename "^[[:space:]]*$guest " $files | awk '{print $5}'` # MEM(k)

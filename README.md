@@ -8,10 +8,10 @@ To be executed on every single node.
 
 ## Requirements
 
-_tested with_
+_tested with XEN 4.11 & [Slackware](https://pub.nethence.com/xen/slackware)_
 
-- XEN 4.11
-- DomUs with [TMEM enabled](https://wiki.xenproject.org/wiki/TMEM)
+- XEN
+- DomUs with [TMEM](https://pub.nethence.com/xen/tmem) [enabled](https://wiki.xenproject.org/wiki/TMEM) (otherwise set `showram=0`)
 - KSH93
 - [spark.bash](https://github.com/holman/spark) or `spark.c`
 
@@ -40,7 +40,7 @@ you might want to use system's memory instead of expansive disk i/o
 
 start the TUI
 
-	./nwr
+	./nwr.ksh
 
 when finished
 
