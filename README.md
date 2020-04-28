@@ -27,7 +27,7 @@ Get ready for sparkles.  Note there's [spark.bash](https://github.com/holman/spa
 
 CPU power, MAXMEM and NIC speed is evaluated dynamically.  However DISK speed is tricky to determine (in sectors of 512 bytes per second).  Some testing (see below) is advised to correctly define max values for disk performance.
 
-	vi nwr
+	vi nwr.ksh
 
 	bridgenic=ethX
 	maxrsect=480000
@@ -50,7 +50,8 @@ Start the TUI
 
 and when finished
 
-	umount /tmp/fastio/
+	rm -rf /tmp/fastio/
+	#umount /tmp/fastio/
 
 ## Acceptance testing
 
@@ -61,27 +62,22 @@ _on some guest_
 CPU
 
 	grep ^proc /proc/cpuinfo
-	nice stress --cpu 8
+	nice stress --cpu 16
 
 RAM (assuming ballooning or TMEM)
 
 	lsmod | grep tmem
-	#stress -m 8 --vm-keep
-	mkdir -p ram/
-	mount -t tmpfs -o size=7168M tmpfs ram/
-	dd if=/dev/zero of=ram/ramload bs=1M
-	rm -f ram/ramload 
-	umount ram/
-	rmdir ram/
+
+	stress -m 16 --vm-keep
+
+	#screen
+	#mkdir -p ram/
+	#mount -t tmpfs -o size=7168M tmpfs ram/
+	#dd if=/dev/zero of=ram/lala bs=1M
+	#umount ram/
+	#rmdir ram/
 
 Note: it shrinks back after a while (few seconds/minutes)
-
-TX - start the server on the load guest
-
-RX - start the server on the host or remote node
-
-	iperf3 -s # server
-	iperf3 -c SERVER_ADDRESS # client
 
 RSECT
 
@@ -93,3 +89,12 @@ WSECT
 	dd if=/dev/zero of=lala conv=sync
 	rm -f lala
 
+TX (upload)
+
+_assuming you got a server listening on your LAN_
+
+	iperf3 -c IPERF-SERVER
+
+RX (download)
+
+	iperf3 -R -c IPERF-SERVER
