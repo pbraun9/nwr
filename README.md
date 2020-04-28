@@ -1,27 +1,29 @@
 # _No Web Required_
 
+![2020-04-28-122156_613x242_scrot.png](i/2020-04-28-122156_613x242_scrot.png)
+
 Performance monitoring from the terminal.  
 Currently only XEN (as with `xentop`) is supported.  
 To be executed on every single node.  
 
-![nwr2](i/nwr2.png)
-
 ## Requirements
 
-_tested with XEN 4.11 & [Slackware](https://pub.nethence.com/xen/slackware)_
+Make sure you have XEN up and running
 
-- XEN
-- DomUs with [TMEM](https://pub.nethence.com/xen/tmem) [enabled](https://wiki.xenproject.org/wiki/TMEM) (otherwise set `showram=0`)
-- KSH93
-- [spark.bash](https://github.com/holman/spark) or `spark.c`
+	xl info
+	xentop -b -i1 | head
 
-preferably `spark.c`
+Make sure all your guests have [TMEM](https://pub.nethence.com/xen/tmem) well [enabled](https://wiki.xenproject.org/wiki/TMEM).  Otherwise disable RAM from the graphcs by setting `showram=0` in the script.
+
+Make sure you've got KSH93 available on your dom0 (floating point capable).
+
+Get ready for sparkles.  Note there's [spark.bash](https://github.com/holman/spark) as an alternative (untested).
 
 	wget https://git.zx2c4.com/spark/plain/spark.c
 	gcc -o spark spark.c -lm
 	cp -i spark /usr/local/bin/
 
-## Configuration
+## Setup
 
 CPU power, MAXMEM and NIC speed is evaluated dynamically.  However DISK speed is tricky to determine (in sectors of 512 bytes per second).  Some testing (see below) is advised to correctly define max values for disk performance.
 
@@ -33,20 +35,24 @@ CPU power, MAXMEM and NIC speed is evaluated dynamically.  However DISK speed is
 
 ## Usage
 
-you might want to use system's memory instead of expansive disk i/o
+We want to use system's memory instead of expansive disk i/o.  Assuming `/tmp/` is on `tmpfs` already
 
-	mkdir -p fastio/
-	mount -t tmpfs -o size=512M tmpfs fastio/
+	mount | grep tmpfs
 
-start the TUI
+otherwise
+
+	mkdir /tmp/fastio/
+	mount -t tmpfs -o size=2G tmpfs /tmp/fastio/
+
+Start the TUI
 
 	./nwr.ksh
 
-when finished
+and when finished
 
-	umount fastio/
+	umount /tmp/fastio/
 
-## Acceptance Testing
+## Acceptance testing
 
 _on some guest_
 
