@@ -37,7 +37,9 @@ function requires {
 	whence xentop >/dev/null || bomb xentop executable not found
 	whence mii-tool >/dev/null || bomb mii-tool executable not found
 	whence spark >/dev/null || bomb spark executable not found
-	[[ -d fastio/ ]] || bomb need fastio/ folder, ideally as tmpfs
+
+	#[[ -d /tmp/fastio/ ]] || bomb need /tmp/fastio/ folder, ideally as tmpfs
+	mkdir -p /tmp/fastio/
 }
 
 function longest {
@@ -83,11 +85,11 @@ function xentopdiff {
         (( oldvalue = `grep -E "^[[:space:]]*$guest " $oldfile | awk "{print \\$$xentopfield}"` ))
         (( diff = newvalue - oldvalue ))
         unset newvalue oldvalue
-        echo $guest:$diff >> fastio/${restype}diff.$date
+        echo $guest:$diff >> /tmp/fastio/${restype}diff.$date
 
         (( diff == 0 && hideidle == 1 )) && return
         unset diff
-        typeset tmpfiles=`ls -1tr fastio/${restype}diff.* | tail -$cols`
+        typeset tmpfiles=`ls -1tr /tmp/fastio/${restype}diff.* | tail -$cols`
         values=`grep -E --no-filename "^$guest:" $tmpfiles | cut -f2 -d:`
 
 	#the trick: we first print a max value, and then get rid of it with sed
@@ -109,7 +111,7 @@ function showram {
 	#	maxram=`free --kilo | grep ^Mem: | awk '{print $2}'`
 	#else
 	#fi
-	maxram=`grep -E "^[[:space:]]*$guest " fastio/xentop.$date | head -1 | awk '{print $7}'` # MAXMEM(k)
+	maxram=`grep -E "^[[:space:]]*$guest " /tmp/fastio/xentop.$date | head -1 | awk '{print $7}'` # MAXMEM(k)
 	values=`grep -E --no-filename "^[[:space:]]*$guest " $files | awk '{print $5}'` # MEM(k)
 	startwagon RAM
 	(( showvalues == 1 )) && echo $maxram $values
@@ -155,10 +157,10 @@ function main {
 	#print maxnet is $maxnet
 	#read
 
-	rm -f fastio/xentop.* fastio/*diff.* fastio/tmpout
+	rm -f /tmp/fastio/xentop.* /tmp/fastio/*diff.* /tmp/fastio/tmpout
 	while true; do
 		date=`date +%s`
-		file=fastio/xentop.$date
+		file=/tmp/fastio/xentop.$date
 
 		xentop -f -b -i 1 > $file
 		guests=`grep -vE '^[[:space:]]*NAME ' $file | awk '{print $1}'`
@@ -174,15 +176,15 @@ function main {
 		(( cols = termcols - longest - 3 * 2 - 1 ))
 		# - 1 so there is a remaining blank col at the end
 
-                filescount=`ls -1tr fastio/xentop.* | wc -l`
-                files=`ls -1tr fastio/xentop.* | tail -$cols`
+                filescount=`ls -1tr /tmp/fastio/xentop.* | wc -l`
+                files=`ls -1tr /tmp/fastio/xentop.* | tail -$cols`
                 #eventually takes the only file as oldfile
-                oldfile=`ls -1tr fastio/xentop.* | tail -2 | head -1`
+                oldfile=`ls -1tr /tmp/fastio/xentop.* | tail -2 | head -1`
 
-		header > fastio/tmpout
-		showguests >> fastio/tmpout
+		header > /tmp/fastio/tmpout
+		showguests >> /tmp/fastio/tmpout
 		clear
-		cat fastio/tmpout
+		cat /tmp/fastio/tmpout
 		sleep 1
 	done
 
