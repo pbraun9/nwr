@@ -1,8 +1,7 @@
 #!/bin/ksh
 
-bridgenic=eth1
-maxrsect=480000
-maxwsect=800
+[[ ! -f /etc/nwr.conf ]] && echo could not find /etc/nwr.conf && exit 1
+source /etc/nwr.conf
 
 showvalues=0
 showsparks=1
@@ -140,7 +139,7 @@ function header {
 	(( totalram = `echo "$tmp" | grep ^total_memory | cut -f2 -d:` ))
 	#(( usedram = totalram - `echo "$tmp" | grep ^free_memory | cut -f2 -d:` ))
 	unset tmp
-	title="$HOSTNAME - $maxcpu CPU seconds - $totalram MB - $maxwsect/$maxrsect sectors/s - FDX $maxnet Mbits/s"
+	title="$HOSTNAME - $maxcpu CPU seconds - $totalram MB - R$maxrsect / W$maxwsect sectors/s - FDX $maxnet Mbits/s"
 	(( spaces = ( termcols - `echo -n $title | wc -c` ) / 2 ))
 	printspaces
 	bold=`tput bold`
@@ -153,9 +152,7 @@ function main {
 
 	# 16 cores -> 1600 % -> 20 cpu seconds (test results)
         (( maxcpu = ( `grep ^processor /proc/cpuinfo | tail -1 | cut -f2 -d:` + 1 ) * 100 / 80 ))
-	(( maxnet = `mii-tool $bridgenic | cut -f3 -d' ' | sed -r 's/[^[:digit:]]//g'` ))
-	#print maxnet is $maxnet
-	#read
+	[[ -z $maxnet ]] && (( maxnet = `mii-tool $bridgenic | cut -f3 -d' ' | sed -r 's/[^[:digit:]]//g'` ))
 
 	rm -f /tmp/fastio/xentop.* /tmp/fastio/*diff.* /tmp/fastio/tmpout
 	while true; do

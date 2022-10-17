@@ -25,13 +25,28 @@ Get ready for sparkles.  Note there's [spark.bash](https://github.com/holman/spa
 
 ## Setup
 
-CPU power, MAXMEM and NIC speed is evaluated dynamically.  However DISK speed is tricky to determine (in sectors of 512 bytes per second).  Some testing (see below) is advised to correctly define max values for disk performance.
+CPU power, MAXMEM and NIC speed is evaluated dynamically.
+However DISK speed is tricky to determine (in sectors of 512 bytes per second).
+Some testing is advised to correctly define max values for disk performance.
 
-	vi nwr.ksh
+_domU_
 
-	bridgenic=ethX
-	maxrsect=480000
-	maxwsect=800
+	hdparm -t /dev/xvda1
+
+_dom0_
+
+	vi /etc/nwr.conf
+
+	# underlying physical interface
+	bridgenic=eth0
+
+	# echo $(( 1232 * 1024 * 1024 / 512 ))
+	# eventually divide again by 2 or 3 as those are shared resources
+	(( maxrsect = 2523136 / 2 ))
+	(( maxwsect = 2523136 / 2 ))
+
+	# assuming 300 Mbit/s link as a shared resource hence divide by 2 or 3
+	maxnet=100
 
 ## Usage
 
@@ -46,6 +61,9 @@ otherwise
 
 Start the TUI
 
+	screen -S nwr
+
+	cd ~/nwr/
 	./nwr.ksh
 
 and when finished
@@ -82,11 +100,11 @@ Note: it shrinks back after a while (few seconds/minutes)
 RSECT
 
 	hdparm -Tt /dev/xvda1
-	dd if=/dev/xvda1 of=/dev/null
+	dd if=/dev/xvda1 of=/dev/null bs=1M count=1024
 
 WSECT
 
-	dd if=/dev/zero of=lala conv=sync
+	dd if=/dev/zero of=lala bs=1M count=1024 conv=sync
 	rm -f lala
 
 TX (upload)
@@ -98,3 +116,15 @@ _assuming you got a server listening on your LAN_
 RX (download)
 
 	iperf3 -R -c IPERF-SERVER
+
+## Troubleshooting
+
+	SIOCGMIIPHY on 'guestbr0' failed: Operation not supported
+
+==> point to the underlying interface, not the bridge
+
+## Bugs
+
+depending on the load and how long the xentop iteration takes to complete, we are not exactly dealing with metrics every second,
+but rather two or three seconds interval, which messes up the results as those are compared against the defined bandwidth maximum values.
+
