@@ -1,22 +1,9 @@
 #!/bin/ksh
 
-[[ ! -f /etc/nwr.conf ]] && echo could not find /etc/nwr.conf && exit 1
-source /etc/nwr.conf
-
-showvalues=0
-showsparks=1
-# 1 strict / 2 relaxed
-hideidle=2
-
-showcpu=1
-showram=1
-showtx=1
-showrx=1
-showrs=1
-showws=1
+(( debug = 0 ))
 
 function bomb {
-	print "Error: $@"
+	print error: $@
 	exit 1
 }
 
@@ -34,8 +21,12 @@ function requires {
 	whence wc >/dev/null || bomb wc executable not found
 
 	whence xentop >/dev/null || bomb xentop executable not found
-	whence mii-tool >/dev/null || bomb mii-tool executable not found
+	#whence mii-tool >/dev/null || bomb mii-tool executable not found
 	whence spark >/dev/null || bomb spark executable not found
+
+	if (( sendalert == 1 )); then
+		whence mail >/dev/null || bomb mail executable not found
+	fi
 
 	#[[ -d /tmp/fastio/ ]] || bomb need /tmp/fastio/ folder, ideally as tmpfs
 	mkdir -p /tmp/fastio/
@@ -72,6 +63,49 @@ function startwagon {
         fi
 }
 
+function start_alert {
+	[[ -z $guest ]] && bomb function start_alert needs guest var
+	[[ -z $tmptype ]] && bomb function start_alert needs tmptype var
+	[[ -z $tmpmax ]] && bomb function start_alert needs tmpmax var
+
+	if [[ ! -f /tmp/fastio/alert-$guest-$tmptype.lock ]]; then
+		touch /tmp/fastio/alert-$guest-$tmptype.lock
+		echo $guest $tmptype - $lastvalue / $tmpmax \($percent%\) | mail -s "$guest $tmptype resource alert" $email
+	fi
+}
+
+function end_alert {
+	[[ -z $guest ]] && bomb function start_alert needs guest var
+	[[ -z $tmptype ]] && bomb function end_alert needs tmptype
+	[[ -z $tmpmax ]] && bomb function end_alert needs tmpmax
+
+	if [[ -f /tmp/fastio/alert-$guest-$tmptype.lock ]]; then
+		rm -f /tmp/fastio/alert-$guest-$tmptype.lock
+		echo $guest $tmptype - $lastvalue / $tmpmax \($percent%\) | mail -s "$guest $tmptype resource ok" $email
+	fi
+}
+
+function raise_alert {
+	[[ -z $2 ]] && bomb function raise_alert needs two args
+	tmptype=$1
+	tmpmax=$2
+
+	(( lastvalue = `echo $values | awk '{print $NF}'` ))
+	(( debug > 0 )) && echo lastvalue is $lastvalue >> /var/log/nwr.log
+	if (( sendalert == 1 )); then
+		(( percent = lastvalue * 100 / tmpmax ))
+		(( debug > 0 )) && echo percent is $percent >> /var/log/nwr.log
+		if (( percent >= 90 )); then
+			start_alert
+		else
+			end_alert
+		fi
+	fi
+
+	unset lastvalue percent
+	unset tmptype tmpmax
+}
+
 function xentopdiff {
 	typeset restype=$1
 	typeset xentopfield=$2
@@ -97,12 +131,15 @@ function xentopdiff {
         typeset restypeup=`echo $restype | tr 'a-z' 'A-Z'`
         startwagon $restypeup
         (( filescount < cols )) && print ' \c'
-        (( showvalues == 1 )) && echo $resmax $values
         (( showsparks == 1 )) && spark $resmax $values | sed -r 's/^...//'
+        (( debugvalues == 1 )) && echo $guest $restype $values / $resmax >> /var/log/nwr.log
+
+	raise_alert $restype $resmax
+
         unset values
 }
 
-function showram {
+function show_ram {
 	#dom0 does not have tmem hence eats your ram and shows MAXMEM(k) "no limit"
 	#we do not differenciate dom0_mem vs autoballoon here
 	[[ $guest = Domain-0 ]] && return
@@ -113,33 +150,36 @@ function showram {
 	maxram=`grep -E "^[[:space:]]*$guest " /tmp/fastio/xentop.$date | head -1 | awk '{print $7}'` # MAXMEM(k)
 	values=`grep -E --no-filename "^[[:space:]]*$guest " $files | awk '{print $5}'` # MEM(k)
 	startwagon RAM
-	(( showvalues == 1 )) && echo $maxram $values
 	(( showsparks == 1 )) && spark $maxram $values | sed -r 's/^...//'
+	(( debugvalues == 1 )) && echo $guest ram $values / $maxram >> /var/log/nwr.log
+
+	raise_alert ram $maxram
+
 	unset maxram values
 }
 
-function showguests {
+function show_guests {
         for guest in $guests; do
                 (( spaces = longest - `echo -n $guest | wc -c` + 1 ))
 
 		(( showcpu == 1 )) && xentopdiff cpu 3 $maxcpu # CPU(sec)
-		(( showram == 1 )) && showram # MEM(k)
+		(( showram == 1 )) && show_ram # MEM(k)
 		(( showtx == 1 )) && xentopdiff tx 11 $maxnet # NETTX(k)
 		(( showrx == 1 )) && xentopdiff rx 12 $maxnet # NETRX(k)
-		(( showrs == 1 )) && xentopdiff rs 17 $maxcpu # VBD_RSECT
-		(( showws == 1 )) && xentopdiff ws 18 $maxcpu # VBD_WSECT
+		(( showrs == 1 )) && xentopdiff rs 17 $maxrsect # VBD_RSECT
+		(( showws == 1 )) && xentopdiff ws 18 $maxwsect # VBD_WSECT
 
 		(( was = 0 ))
         done; unset guest
 }
 
-function header {
+function show_header {
 	HOSTNAME=${HOSTNAME:-`uname -n`}
 	tmp=`xl info 2>&1`
 	(( totalram = `echo "$tmp" | grep ^total_memory | cut -f2 -d:` ))
 	#(( usedram = totalram - `echo "$tmp" | grep ^free_memory | cut -f2 -d:` ))
 	unset tmp
-	title="$HOSTNAME - $maxcpu CPU seconds - $totalram MB - R$maxrsect / W$maxwsect sectors/s - FDX $maxnet Mbits/s"
+	title="$HOSTNAME - $maxcpu CPU seconds - $totalram MB - R $maxrsect / W $maxwsect sectors/s - $maxnet Mbit/s"
 	(( spaces = ( termcols - `echo -n $title | wc -c` ) / 2 ))
 	printspaces
 	bold=`tput bold`
@@ -148,11 +188,27 @@ function header {
 }
 
 function main {
+	[[ ! -f /etc/nwr.conf ]] && echo could not find /etc/nwr.conf && exit 1
+	source /etc/nwr.conf
+
+	[[ -z $bridgenic ]] && bomb bridgenic not defined
+	[[ -z $cores ]] && bomb cores not defined
+	[[ -z $maxrsect ]] && bomb maxrsect not defined
+	[[ -z $maxwsect ]] && bomb maxwsect not defined
+	[[ -z $maxnet ]] && bomb maxnet not defined
+
+	# values are per second and we are running the script every 4-5 seconds
+	# hence we need to multiply by 5 (more precise than dividing values by 5)
+	(( maxcpu = cores * 5 ))
+	# maxram is static
+	(( maxrsect = maxrsect * 5 ))
+	(( maxwsect = maxrsect * 5 ))
+	(( maxnet = maxnet * 5 ))
+
 	requires
 
 	# 16 cores -> 1600 % -> 20 cpu seconds (test results)
-        (( maxcpu = ( `grep ^processor /proc/cpuinfo | tail -1 | cut -f2 -d:` + 1 ) * 100 / 80 ))
-	[[ -z $maxnet ]] && (( maxnet = `mii-tool $bridgenic | cut -f3 -d' ' | sed -r 's/[^[:digit:]]//g'` ))
+        #(( maxcpu = ( `grep ^processor /proc/cpuinfo | tail -1 | cut -f2 -d:` + 1 ) * 100 / 80 ))
 
 	rm -f /tmp/fastio/xentop.* /tmp/fastio/*diff.* /tmp/fastio/tmpout
 	while true; do
@@ -178,11 +234,13 @@ function main {
                 #eventually takes the only file as oldfile
                 oldfile=`ls -1tr /tmp/fastio/xentop.* | tail -2 | head -1`
 
-		header > /tmp/fastio/tmpout
-		showguests >> /tmp/fastio/tmpout
+		show_header > /tmp/fastio/tmpout
+		show_guests >> /tmp/fastio/tmpout
 		clear
 		cat /tmp/fastio/tmpout
-		sleep 1
+
+		# assuming xentop takes about 1 second by itself on a loaded dom0 host
+		sleep 4
 	done
 
 	unset longest spaces maxcpu maxnet
