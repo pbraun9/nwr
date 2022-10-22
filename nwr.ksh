@@ -162,7 +162,17 @@ function show_guests {
         for guest in $guests; do
                 (( spaces = longest - `echo -n $guest | wc -c` + 1 ))
 
-		(( showcpu == 1 )) && xentopdiff cpu 3 $maxcpu # CPU(sec)
+		if (( showcpu == 1 )); then
+			if [[ $guest = Domain-0 ]]; then
+				cores=32
+				(( maxcpu = cores * 7 ))
+			else
+				source /etc/nwr.conf
+				(( maxcpu = cores * 7 ))
+			fi
+			xentopdiff cpu 3 $maxcpu # CPU(sec)
+		fi
+
 		(( showram == 1 )) && show_ram # MEM(k)
 		(( showtx == 1 )) && xentopdiff tx 11 $maxnet # NETTX(k)
 		(( showrx == 1 )) && xentopdiff rx 12 $maxnet # NETRX(k)
@@ -199,10 +209,15 @@ function main {
 
 	# values are per second and we are running the script every 4-5 seconds
 	# hence we need to multiply by 5 (more precise than dividing values by 5)
-	(( maxcpu = cores * 5 ))
+
+	# see further up
+	#(( maxcpu = cores * 5 ))
+
 	# maxram is static
+
 	(( maxrsect = maxrsect * 5 ))
 	(( maxwsect = maxrsect * 5 ))
+
 	(( maxnet = maxnet * 5 ))
 
 	requires

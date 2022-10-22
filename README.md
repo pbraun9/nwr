@@ -13,7 +13,8 @@ Make sure you have XEN up and running
 	xl info
 	xentop -b -i1 | head
 
-Make sure all your guests have [TMEM](https://pub.nethence.com/xen/tmem) well [enabled](https://wiki.xenproject.org/wiki/TMEM).  Otherwise disable RAM from the graphcs by setting `showram=0` in the script.
+Make sure all your guests have [TMEM](https://pub.nethence.com/xen/tmem) [enabled](https://wiki.xenproject.org/wiki/TMEM).
+Otherwise disable RAM from the graphs by setting `showram=0` in the configuration.
 
 Make sure you've got KSH93 available on your dom0 (floating point capable).
 
@@ -47,7 +48,12 @@ We want to use system's memory instead of expansive disk i/o.  Assuming `/tmp/` 
 otherwise
 
 	mkdir /tmp/fastio/
-	mount -t tmpfs -o size=2G tmpfs /tmp/fastio/
+	#mount -t tmpfs -o size=2G tmpfs /tmp/fastio/
+	vi /etc/fstab
+
+	tmpfs /tmp/fastio tmpfs nosuid,nodev,noexec,async,noatime,nodiratime,size=2097152k 0 0
+
+	mount /mnt/fastio/
 
 Start the TUI
 
