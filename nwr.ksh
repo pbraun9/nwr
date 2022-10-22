@@ -185,11 +185,17 @@ function show_guests {
 
 function show_header {
 	HOSTNAME=${HOSTNAME:-`uname -n`}
+
+	source /etc/nwr.conf
+	(( maxcpu = cores * 7 ))
+
 	tmp=`xl info 2>&1`
 	(( totalram = `echo "$tmp" | grep ^total_memory | cut -f2 -d:` ))
 	#(( usedram = totalram - `echo "$tmp" | grep ^free_memory | cut -f2 -d:` ))
 	unset tmp
-	title="$HOSTNAME - $maxcpu CPU seconds - $totalram MB - R $maxrsect / W $maxwsect sectors/s - $maxnet Mbit/s"
+
+	title="$HOSTNAME guests - CPU $maxcpu seconds - RAM $(( maxram / 1024 )) MiB - I/O $maxrsect/$maxwsect sectors/s - TX/RX $maxnet Mbit/s"
+
 	(( spaces = ( termcols - `echo -n $title | wc -c` ) / 2 ))
 	printspaces
 	bold=`tput bold`
