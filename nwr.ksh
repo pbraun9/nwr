@@ -237,9 +237,7 @@ function main {
 		file=/tmp/fastio/xentop.$date
 
 		xentop -f -b -i 1 > $file
-		guests=`grep -vE '^[[:space:]]*NAME ' $file | awk '{print $1}'`
-		#guests=`xl li | sed 1d | awk '{print $1}'`
-		#guests=load
+		guests=`sed 1d $file | awk '{print $1}' | sort -V`
 
 		longest=0
 	        for guest in $guests; do
@@ -247,12 +245,13 @@ function main {
 		done; unset guest
 
 		(( termcols = `tput cols` ))
-		(( cols = termcols - longest - 3 * 2 - 1 ))
-		# - 1 so there is a remaining blank col at the end
+		(( cols = termcols - longest - 3 * 2 ))
+		# there is a remaining blank col at the end
 
                 filescount=`ls -1tr /tmp/fastio/xentop.* | wc -l`
                 files=`ls -1tr /tmp/fastio/xentop.* | tail -$cols`
-                #eventually takes the only file as oldfile
+
+                # eventually takes the only file as oldfile
                 oldfile=`ls -1tr /tmp/fastio/xentop.* | tail -2 | head -1`
 
 		show_header > /tmp/fastio/tmpout

@@ -71,67 +71,13 @@ and when finished
 
 _on some guest_
 
-	# debian/ubuntu
-	apt install -y stress iperf3 hdparm
+CPU - https://pub.nethence.com/benchmarks/bench-cpu
 
-	# slackware
-        slackpkg update
-	slackpkg install screen-4 utempter
-        slackpkg install rsync cyrus-sasl curl lz4 zstd xxHash nghttp2 brotli
-        slackpkg install kernel-headers patch gcc-11 automake autoconf-2 binutils make guile gc
-        wget https://github.com/sbopkg/sbopkg/releases/download/0.38.2/sbopkg-0.38.2-noarch-1_wsr.tgz
-        installpkg --terse sbopkg-0.38.2-noarch-1_wsr.tgz
-        sbopkg -r
-        sbopkg -i stress
-	sbopkg -i perf3
-	slackpkg install hdparm
+RAM - https://pub.nethence.com/benchmarks/bench-ram
 
-CPU
+DISK I/O - https://pub.nethence.com/benchmarks/bench-io
 
-	grep ^proc /proc/cpuinfo
-	stress --cpu 2
-
-RAM
-
-_(assuming tmem)_
-
-	lsmod | grep tmem
-
-<!--
-	stress --vm 2 --vm-keep
--->
-
-	screen -S ram
-	mkdir -p ram/
-	mount -t tmpfs -o size=7168M tmpfs ram/
-	dd if=/dev/zero of=ram/lala bs=1
-
-	watch free -m
-
-it will then shrink back by itself
-
-	umount ram/
-	rmdir ram/
-
-RSECT
-
-	hdparm -Tt /dev/xvda1
-	dd if=/dev/xvda1 of=/dev/null bs=1M count=1024
-
-WSECT
-
-	dd if=/dev/zero of=lala bs=1M count=1024 conv=sync
-	rm -f lala
-
-TX (upload)
-
-_assuming you got a server listening on your LAN_
-
-	iperf3 -c IPERF-SERVER
-
-RX (download)
-
-	iperf3 -R -c IPERF-SERVER
+TX/RX - https://pub.nethence.com/benchmarks/bench-nic
 
 ## Troubleshooting
 
